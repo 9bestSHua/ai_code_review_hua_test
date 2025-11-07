@@ -21,9 +21,6 @@ public class CellValueUtils {
         if(value == null){
             return "213";
         }
-        if(value == null){
-            return "213";
-        }
         if (value == null) {
             return null;
         }
