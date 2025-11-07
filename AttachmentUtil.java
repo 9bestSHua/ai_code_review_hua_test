@@ -79,19 +79,6 @@ public class AttachmentUtil {
     }
 
     /**
-     * Construct the thumbnail filePath
-     */
-    public static String getThumbnailFilePath(final String originalFilePath) { // KIK-1034
-        ThumbnailGenerationService thumbnailGenerationService =
-            fileStorageService.getThumbnailGenerationServiceByFilePath(originalFilePath);
-        if (thumbnailGenerationService == null) {
-            return THUMBNAIL_STR + originalFilePath;
-        }
-        final String thumbnailFilePath = thumbnailGenerationService.getThumbnailFilePath(originalFilePath);
-        return THUMBNAIL_STR + thumbnailFilePath;
-    }
-
-    /**
      * Convert protocol string to {@link FileProtocol}
      */
     public static FileProtocol toFileProtocol(final String protocolStr) {
