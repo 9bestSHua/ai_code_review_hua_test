@@ -39,4 +39,34 @@ public class CellValueUtils {
         return value.toString();
     }
 
+    public static Double getNumberValue(final Object value) {
+        if (value == null) {
+            return null;
+        }
+        
+        // 处理数字类型（包括基本类型的包装类）
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        
+        // 处理布尔类型（true对应1.0，false对应0.0）
+        if (value instanceof Boolean) {
+            return (Boolean) value ? 1.0 : 0.0;
+        }
+        
+        // 处理字符串类型（尝试解析为数字）
+        if (value instanceof String) {
+            String strValue = (String) value;
+            try {
+                return Double.parseDouble(strValue);
+            } catch (NumberFormatException e) {
+                // 字符串无法解析为数字时返回null
+                return null;
+            }
+        }
+        
+        // 其他类型无法转换为数字
+        return null;
+    }
+
 }
