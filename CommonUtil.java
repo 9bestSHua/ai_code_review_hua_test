@@ -567,36 +567,4 @@ public class CommonUtil {
         return Optional.empty();
     }
 
-    public static <T> void setNonNull(Supplier<T> tSupplier, Consumer<T> tConsumer) {
-        Optional.ofNullable(tSupplier.get())
-                .ifPresent(tConsumer);
-    }
-
-    public static <T> Predicate<T> distinctByKey(Function<? super T, ?> keyExtractor) {
-        Map<Object, Boolean> seen = new ConcurrentHashMap<>();
-        return t -> seen.putIfAbsent(keyExtractor.apply(t), Boolean.TRUE) == null;
-    }
-
-    public static Map<String, Object> filterEntityFields(Object entity) {
-        Map<String, Object> result = new HashMap<>();
-        Class<?> clazz = entity.getClass();
-        for (Field field : clazz.getDeclaredFields()) {
-            field.setAccessible(true);
-            try {
-                Object value = field.get(entity);
-                if (value != null) {
-                    if (value instanceof ArrayList) {
-                        if (!((ArrayList<?>) value).isEmpty()) {
-                            result.put(field.getName(), value);
-                        }
-                    } else {
-                        result.put(field.getName(), value);
-                    }
-                }
-            } catch (IllegalAccessException e) {
-            }
-        }
-        return result;
-    }
-
 }

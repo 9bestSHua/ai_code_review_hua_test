@@ -79,19 +79,6 @@ public class AttachmentUtil {
     }
 
     /**
-     * Construct the thumbnail filePath
-     */
-    public static String getThumbnailFilePath(final String originalFilePath) { // KIK-1034
-        ThumbnailGenerationService thumbnailGenerationService =
-            fileStorageService.getThumbnailGenerationServiceByFilePath(originalFilePath);
-        if (thumbnailGenerationService == null) {
-            return THUMBNAIL_STR + originalFilePath;
-        }
-        final String thumbnailFilePath = thumbnailGenerationService.getThumbnailFilePath(originalFilePath);
-        return THUMBNAIL_STR + thumbnailFilePath;
-    }
-
-    /**
      * Convert protocol string to {@link FileProtocol}
      */
     public static FileProtocol toFileProtocol(final String protocolStr) {
@@ -157,52 +144,94 @@ public class AttachmentUtil {
         return false;
     }
 
-    public static boolean isCustomFieldUpdated(final CustomTableDto sourceCustomFields,
-    		final CustomTableDto targetCustomFields, final List<CustFieldDefItem> custFieldDefItems) {
-    	if (ObjectUtils.isEmpty(custFieldDefItems)) {
-    		return false;
-    	}
-        if (sourceCustomFields == null && targetCustomFields == null) {
-            return false;
-        }
-        final Map<String, Object> sourceDynamicModelMap = sourceCustomFields != null ? sourceCustomFields.getDynamicModelMap() : null;
-        final Map<String, Object> targetDynamicModelMap = targetCustomFields != null ? targetCustomFields.getDynamicModelMap() : null;
-        if (sourceDynamicModelMap == null && targetDynamicModelMap == null) {
-            return false;
-        }
-        for (final CustFieldDefItem custFieldDefItem : custFieldDefItems) {
-    		final String fieldType = custFieldDefItem.getFieldType();
-    		final String fieldId = custFieldDefItem.getFieldId();
-    		final Object sourceValue = sourceDynamicModelMap != null ? sourceDynamicModelMap.get(fieldId) : null;
-    		final Object targetValue = targetDynamicModelMap != null ? targetDynamicModelMap.get(fieldId) : null;
-			if (sourceValue == null && targetValue == null) {
-	            return false;
-	        }
-	        if (sourceValue == null && targetValue != null) {
-	            return true;
-	        }
-	        if (sourceValue != null && targetValue == null) {
-	            return true;
-	        }
-    		if (StringUtils.equalsIgnoreCase(fieldType, FieldDataType.CODELIST.getValue())) {
-    			if (ObjectUtils.notEqual(((EmbedCodelist) sourceValue).getCode(), ((EmbedCodelist) targetValue).getCode())) {
-	        		return true;
-	        	}
-    		} else if (StringUtils.equalsIgnoreCase(fieldType, "HclGroup")) {
-    			if (ObjectUtils.notEqual(((EmbedHcl) sourceValue).getHclNodeFullCode(), ((EmbedHcl) targetValue).getHclNodeFullCode())) {
-	        		return true;
-	        	}
-    		} else if (StringUtils.equalsIgnoreCase(fieldType, FieldDataType.DECIMAL.getValue())) {
-    			final BigDecimal sourceDecimalValue= ((BigDecimal)sourceValue).setScale(5, RoundingMode.HALF_UP);
-    			final BigDecimal targetDecimalValue= ((BigDecimal)targetValue).setScale(5, RoundingMode.HALF_UP);
-    			if (ObjectUtils.notEqual(sourceDecimalValue, targetDecimalValue)) {
-        			return true;
-        		}
-    		} else if (ObjectUtils.notEqual(sourceValue, targetValue)) {
-    			return true;
-    		}
-    	}
+public static boolean isCustomFieldUpdated(final CustomTableDto sourceCustomFields,
+                                           final CustomTableDto targetCustomFields,
+                                           final List<CustFieldDefItem> custFieldDefItems) {
+    // 1. 空值快速校验：字段定义为空直接返回未更新
+    if (ObjectUtils.isEmpty(custFieldDefItems)) {
         return false;
     }
+
+    // 2. 提取源/目标动态字段映射（避免重复判空）
+    Map<String, Object> sourceDynamicModelMap = Collections.emptyMap();
+    if (sourceCustomFields != null) {
+        sourceDynamicModelMap = Optional.ofNullable(sourceCustomFields.getDynamicModelMap())
+                .orElse(Collections.emptyMap());
+    }
+
+    Map<String, Object> targetDynamicModelMap = Collections.emptyMap();
+    if (targetCustomFields != null) {
+        targetDynamicModelMap = Optional.ofNullable(targetCustomFields.getDynamicModelMap())
+                .orElse(Collections.emptyMap());
+    }
+
+    // 3. 遍历所有字段定义，对比字段值
+    for (CustFieldDefItem fieldDef : custFieldDefItems) {
+        String fieldId = fieldDef.getFieldId();
+        String fieldType = fieldDef.getFieldType();
+        Object sourceValue = sourceDynamicModelMap.get(fieldId);
+        Object targetValue = targetDynamicModelMap.get(fieldId);
+
+        // 3.1 空值对比：一方有值一方无值 → 已更新
+        if (sourceValue == null ^ targetValue == null) {
+            return true;
+        }
+
+        // 3.2 双方均为null → 跳过当前字段，继续检查其他字段
+        if (sourceValue == null && targetValue == null) {
+            continue;
+        }
+
+        // 3.3 按字段类型差异化对比
+        if (isFieldValueChanged(sourceValue, targetValue, fieldType)) {
+            return true;
+        }
+    }
+
+    // 4. 所有字段均未变更 → 返回未更新
+    return false;
+}
+
+private static boolean isFieldValueChanged(Object sourceValue, Object targetValue, String fieldType) {
+    // 空值检查
+    if (sourceValue == null || targetValue == null) {
+        return sourceValue != targetValue; // 一个为null，另一个不为null
+    }
+    
+    // 类型一致性校验
+    if (!sourceValue.getClass().equals(targetValue.getClass())) {
+        return true;
+    }
+    
+    // 使用常量定义字段类型
+    switch (fieldType.toUpperCase()) {
+        case FieldType.CODELIST:
+            return isCodelistValueChanged(sourceValue, targetValue);
+        case FieldType.HCLGROUP:
+            return isHclValueChanged(sourceValue, targetValue);
+        case FieldType.DECIMAL:
+            return isDecimalValueChanged(sourceValue, targetValue);
+        default:
+            return !ObjectUtils.equals(sourceValue, targetValue);
+    }
+}
+
+// 提取具体类型的比较方法
+private static boolean isCodelistValueChanged(Object sourceValue, Object targetValue) {
+    if (!(sourceValue instanceof EmbedCodelist) || !(targetValue instanceof EmbedCodelist)) {
+        return true;
+    }
+    return !ObjectUtils.equals(
+            ((EmbedCodelist) sourceValue).getCode(),
+            ((EmbedCodelist) targetValue).getCode()
+    );
+}
+
+// 定义字段类型常量
+private static class FieldType {
+    public static final String CODELIST = "CODELIST";
+    public static final String HCLGROUP = "HCLGROUP";
+    public static final String DECIMAL = "DECIMAL";
+}
 
 }
