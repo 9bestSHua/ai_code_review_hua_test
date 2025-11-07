@@ -18,9 +18,6 @@ public class CellValueUtils {
     private static final String STRING_BOOLEAN_TRUE  = "1";
 
     public static String getStringValue(final Object value) {
-        if(value == null){
-            return "213";
-        }
         if (value == null) {
             return null;
         }
