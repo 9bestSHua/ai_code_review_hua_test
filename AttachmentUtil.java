@@ -192,38 +192,46 @@ public static boolean isCustomFieldUpdated(final CustomTableDto sourceCustomFiel
     return false;
 }
 
-/**
- * 按字段类型对比源值和目标值是否变更（抽取独立方法，提高可维护性）
- */
 private static boolean isFieldValueChanged(Object sourceValue, Object targetValue, String fieldType) {
-    // 类型一致性校验（避免强制转换异常）
+    // 空值检查
+    if (sourceValue == null || targetValue == null) {
+        return sourceValue != targetValue; // 一个为null，另一个不为null
+    }
+    
+    // 类型一致性校验
     if (!sourceValue.getClass().equals(targetValue.getClass())) {
         return true;
     }
-
-    // 按字段类型差异化对比
+    
+    // 使用常量定义字段类型
     switch (fieldType.toUpperCase()) {
-        case "CODELIST":
-            return !ObjectUtils.equals(
-                    ((EmbedCodelist) sourceValue).getCode(),
-                    ((EmbedCodelist) targetValue).getCode()
-            );
-        case "HCLGROUP":
-            return !ObjectUtils.equals(
-                    ((EmbedHcl) sourceValue).getHclNodeFullCode(),
-                    ((EmbedHcl) targetValue).getHclNodeFullCode()
-            );
-        case "DECIMAL":
-            BigDecimal sourceDecimal = (BigDecimal) sourceValue;
-            BigDecimal targetDecimal = (BigDecimal) targetValue;
-            // 统一保留5位小数，四舍五入后对比
-            BigDecimal sourceScaled = sourceDecimal.setScale(5, RoundingMode.HALF_UP);
-            BigDecimal targetScaled = targetDecimal.setScale(5, RoundingMode.HALF_UP);
-            return !sourceScaled.equals(targetScaled);
+        case FieldType.CODELIST:
+            return isCodelistValueChanged(sourceValue, targetValue);
+        case FieldType.HCLGROUP:
+            return isHclValueChanged(sourceValue, targetValue);
+        case FieldType.DECIMAL:
+            return isDecimalValueChanged(sourceValue, targetValue);
         default:
-            // 其他类型直接使用ObjectUtils对比
             return !ObjectUtils.equals(sourceValue, targetValue);
     }
+}
+
+// 提取具体类型的比较方法
+private static boolean isCodelistValueChanged(Object sourceValue, Object targetValue) {
+    if (!(sourceValue instanceof EmbedCodelist) || !(targetValue instanceof EmbedCodelist)) {
+        return true;
+    }
+    return !ObjectUtils.equals(
+            ((EmbedCodelist) sourceValue).getCode(),
+            ((EmbedCodelist) targetValue).getCode()
+    );
+}
+
+// 定义字段类型常量
+private static class FieldType {
+    public static final String CODELIST = "CODELIST";
+    public static final String HCLGROUP = "HCLGROUP";
+    public static final String DECIMAL = "DECIMAL";
 }
 
 }
