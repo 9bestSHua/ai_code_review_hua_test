@@ -21,6 +21,9 @@ public class CellValueUtils {
         if (value == null) {
             return null;
         }
+        if (value == null) {
+            return null;
+        }
         if (value instanceof String) {
             return (String) value;
         }
